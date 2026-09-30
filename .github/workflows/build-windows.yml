@@ -1,0 +1,70 @@
+name: Build SonicDNA SuperAmp Windows ASIO Installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure x64
+        shell: pwsh
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: Build Standalone and VST3
+        shell: pwsh
+        run: cmake --build build --config Release --target SDNASuperAmp_Standalone SDNASuperAmp_VST3 --parallel 2
+
+      - name: Collect Windows build
+        shell: pwsh
+        run: |
+          $standalone = 'build/SDNASuperAmp_artefacts/Release/Standalone/SonicDNA SuperAmp.exe'
+          $plugin = 'build/SDNASuperAmp_artefacts/Release/VST3/SonicDNA SuperAmp.vst3'
+          if (-not (Test-Path $standalone -PathType Leaf)) { throw "Standalone missing: $standalone" }
+          if (-not (Test-Path $plugin -PathType Container)) { throw "VST3 missing: $plugin" }
+          New-Item -ItemType Directory -Force 'distribution/Standalone' | Out-Null
+          New-Item -ItemType Directory -Force 'distribution/VST3' | Out-Null
+          Copy-Item $standalone 'distribution/Standalone/SonicDNA SuperAmp.exe'
+          Copy-Item $plugin 'distribution/VST3/' -Recurse
+
+      - name: Smoke test standalone launch
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'distribution/Standalone/SonicDNA SuperAmp.exe'
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 5
+          if ($p.HasExited) { throw "Standalone exited during launch smoke test with code $($p.ExitCode)" }
+          Stop-Process -Id $p.Id -Force
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force 'installer-output' | Out-Null
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "Installer/Windows/SDNASuperAmp.iss"
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: SonicDNA-SuperAmp-Windows-x64-ASIO-Installer
+          path: installer-output/SonicDNA-SuperAmp-Windows-x64-ASIO-Setup.exe
+          if-no-files-found: error
+
+      - name: Upload raw Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: SonicDNA-SuperAmp-Windows-x64-ASIO-Raw
+          path: distribution/
+          if-no-files-found: error

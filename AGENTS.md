@@ -1,0 +1,1 @@
+For every Windows build, keep JUCE_ASIO=1 enabled and JUCE 8.0.11 or later. Preserve paired and single NAM processing, effects, tuner and startup fixes. Use the wide SonicDNA.png banner in the interface and square SonicDNAIcon artwork for application icons.

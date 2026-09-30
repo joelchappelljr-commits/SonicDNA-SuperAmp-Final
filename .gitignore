@@ -1,0 +1,4 @@
+build*/
+distribution/
+installer-output/
+.DS_Store
